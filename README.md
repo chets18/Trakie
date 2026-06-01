@@ -12,16 +12,16 @@ trakie is a beautiful, private, and fully offline-first personal dashboard built
 ### 📱 Screenshots
 
 <p align="center">
-  <img src="assets/.aistudio/Screenshot%202026-06-01%20183648.png" width="220" alt="Activity Tracking Screen" style="margin: 10px;" />
-  <img src="assets/.aistudio/Screenshot%202026-06-01%20183706.png" width="220" alt="Daily Logs & Ratings" style="margin: 10px;" />
-  <img src="assets/.aistudio/Screenshot%202026-06-01%20183715.png" width="220" alt="Smart Notifier & Alarms" style="margin: 10px;" />
-  <img src="assets/.aistudio/Screenshot%202026-06-01%20183729.png" width="220" alt="Notion-style Notes Editor" style="margin: 10px;" />
+  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_183648.png" width="220" alt="Activity Tracking Screen" /></kbd>
+  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_183706.png" width="220" alt="Daily Logs & Ratings" /></kbd>
+  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_183715.png" width="220" alt="Smart Notifier & Alarms" /></kbd>
+  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_183729.png" width="220" alt="Notion-style Notes Editor" /></kbd>
 </p>
 <p align="center">
-  <img src="assets/.aistudio/Screenshot%202026-06-01%20183742.png" width="220" alt="Analytics Graphs" style="margin: 10px;" />
-  <img src="assets/.aistudio/Screenshot%202026-06-01%20183804.png" width="220" alt="Home Screen Widget" style="margin: 10px;" />
-  <img src="assets/.aistudio/Screenshot%202026-06-01%20165701.png" width="220" alt="Theme Toggle" style="margin: 10px;" />
-  <img src="assets/.aistudio/Screenshot%202026-06-01%20165715.png" width="220" alt="Stats Screen" style="margin: 10px;" />
+  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_183742.png" width="220" alt="Analytics Graphs" /></kbd>
+  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_183804.png" width="220" alt="Home Screen Widget" /></kbd>
+  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_165701.png" width="220" alt="Theme Toggle" /></kbd>
+  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_165715.png" width="220" alt="Stats Screen" /></kbd>
 </p>
 
 ---
