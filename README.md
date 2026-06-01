@@ -20,8 +20,7 @@ trakie is a beautiful, private, and fully offline-first personal dashboard built
 <p align="center">
   <kbd><img src="assets/screenshots/Screenshot_2026-06-01_183742.png" width="220" alt="Analytics Graphs" /></kbd>
   <kbd><img src="assets/screenshots/Screenshot_2026-06-01_183804.png" width="220" alt="Home Screen Widget" /></kbd>
-  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_165701.png" width="220" alt="Theme Toggle" /></kbd>
-  <kbd><img src="assets/screenshots/Screenshot_2026-06-01_165715.png" width="220" alt="Stats Screen" /></kbd>
+ 
 </p>
 
 ---
