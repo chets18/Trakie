@@ -1,3 +1,4 @@
+// Developer: Chetraj Jaishi
 package com.example.receiver
 
 import android.app.AlarmManager
@@ -39,13 +40,14 @@ class BootReceiver : BroadcastReceiver() {
                         }
                     }
                     
-                    // Reschedule custom notifier if enabled in preferences
-                    val prefs = context.getSharedPreferences("tracker_prefs", Context.MODE_PRIVATE)
-                    val notifierEnabled = prefs.getBoolean("notifier_enabled", false)
-                    if (notifierEnabled) {
-                        val interval = prefs.getInt("notifier_interval_minutes", 20)
-                        NotifierReceiver.scheduleNotification(context, interval)
-                        Log.d("BootReceiver", "Rescheduled custom notifier successfully at interval: $interval mins")
+                    try {
+                        val activeReminders = db.reminderDao.getActiveReminders()
+                        activeReminders.forEach { reminder ->
+                            NotifierReceiver.scheduleReminder(context, reminder)
+                        }
+                        Log.d("BootReceiver", "Rescheduled ${activeReminders.size} active custom reminders on boot.")
+                    } catch (e: Exception) {
+                        Log.e("BootReceiver", "Failed to reschedule reminders on boot", e)
                     }
                 } catch (e: Exception) {
                     Log.e("BootReceiver", "Failed to reschedule on boot", e)

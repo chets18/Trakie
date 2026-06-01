@@ -1,3 +1,4 @@
+// Developer: Chetraj Jaishi
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -7,11 +8,11 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.trakie"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.realtimetracker.nyxtqz"
+    applicationId = "com.trakie.android"
     minSdk = 24
     targetSdk = 36
     versionCode = 1

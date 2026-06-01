@@ -1,3 +1,4 @@
+// Developer: Chetraj Jaishi
 pluginManagement {
   repositories {
     google {

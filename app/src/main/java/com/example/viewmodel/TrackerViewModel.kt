@@ -1,3 +1,4 @@
+// Developer: Chetraj Jaishi
 package com.example.viewmodel
 
 import android.app.AlarmManager
@@ -17,9 +18,12 @@ import com.example.data.ActivityLog
 import com.example.data.Alarm
 import com.example.data.AppDatabase
 import com.example.data.Note
+import com.example.data.Reminder
+import com.example.data.DailyRating
 import com.example.MainActivity
 import com.example.data.TrackerRepository
 import com.example.receiver.AlarmReceiver
+import com.example.receiver.NotifierReceiver
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +39,18 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     private val db = AppDatabase.getDatabase(application)
 
     private val repository = TrackerRepository(db)
+
+    // Real-Time Activity Tracking Engine (Shared with Widget)
+    private var _activeActivity = MutableStateFlow<String?>(null)
+    val activeActivity: StateFlow<String?> = _activeActivity.asStateFlow()
+
+    private var _activeActivityStartTime = MutableStateFlow<Long?>(null)
+    val activeActivityStartTime: StateFlow<Long?> = _activeActivityStartTime.asStateFlow()
+
+    private var _activeActivitySeconds = MutableStateFlow(0L)
+    val activeActivitySeconds: StateFlow<Long> = _activeActivitySeconds.asStateFlow()
+
+    private var trackerJob: Job? = null
 
     // Data Flows
     val allNotes: StateFlow<List<Note>> = repository.allNotes.stateIn(
@@ -55,11 +71,23 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         initialValue = emptyList()
     )
 
+    val allReminders: StateFlow<List<Reminder>> = repository.allReminders.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    val allDailyRatings: StateFlow<List<DailyRating>> = repository.allDailyRatings.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
     // ------------------------------------------------------------------------
-    // Dark Mode Local Persistence
+    // Dark Mode & Monochrome Local Persistence
     // ------------------------------------------------------------------------
     private val prefs = application.getSharedPreferences("tracker_prefs", Context.MODE_PRIVATE)
-    private val _isDarkMode = MutableStateFlow(prefs.getBoolean("dark_mode", true)) // Default to beautiful dark mode
+    private val _isDarkMode = MutableStateFlow(prefs.getBoolean("dark_mode", true))
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
 
     fun toggleDarkMode() {
@@ -68,42 +96,75 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         prefs.edit().putBoolean("dark_mode", nextVal).apply()
     }
 
+    private val _isMonochromeMode = MutableStateFlow(prefs.getBoolean("monochrome_mode", false))
+    val isMonochromeMode: StateFlow<Boolean> = _isMonochromeMode.asStateFlow()
+
+    fun toggleMonochromeMode() {
+        val nextVal = !_isMonochromeMode.value
+        _isMonochromeMode.value = nextVal
+        prefs.edit().putBoolean("monochrome_mode", nextVal).apply()
+    }
+
     // ------------------------------------------------------------------------
-    // Notifier Controls
+    // Database-backed Dynamic Reminders
     // ------------------------------------------------------------------------
-    private val _notifierEnabled = MutableStateFlow(prefs.getBoolean("notifier_enabled", false))
-    val notifierEnabled: StateFlow<Boolean> = _notifierEnabled.asStateFlow()
-
-    private val _notifierIntervalMinutes = MutableStateFlow(prefs.getInt("notifier_interval_minutes", 20))
-    val notifierIntervalMinutes: StateFlow<Int> = _notifierIntervalMinutes.asStateFlow()
-
-    private val _notifierMessage = MutableStateFlow(prefs.getString("notifier_message", "Time to review your progress!") ?: "Time to check in!")
-    val notifierMessage: StateFlow<String> = _notifierMessage.asStateFlow()
-
-    fun toggleNotifier(enabled: Boolean) {
-        prefs.edit().putBoolean("notifier_enabled", enabled).apply()
-        _notifierEnabled.value = enabled
-        val app = getApplication<Application>()
-        if (enabled) {
-            com.example.receiver.NotifierReceiver.scheduleNotification(app, _notifierIntervalMinutes.value)
-        } else {
-            com.example.receiver.NotifierReceiver.cancelNotification(app)
+    fun addReminder(title: String, intervalMinutes: Int) {
+        viewModelScope.launch {
+            val reminder = Reminder(title = title, intervalMinutes = intervalMinutes, isEnabled = true)
+            val insertedId = repository.insertReminder(reminder)
+            // Schedule using AlarmManager
+            NotifierReceiver.scheduleReminder(getApplication(), reminder.copy(id = insertedId.toInt()))
         }
     }
 
-    fun updateNotifierSettings(intervalMinutes: Int, message: String) {
-        prefs.edit()
-            .putInt("notifier_interval_minutes", intervalMinutes)
-            .putString("notifier_message", message)
-            .apply()
-        _notifierIntervalMinutes.value = intervalMinutes
-        _notifierMessage.value = message
+    fun toggleReminder(reminder: Reminder) {
+        viewModelScope.launch {
+            val updated = reminder.copy(isEnabled = !reminder.isEnabled)
+            repository.insertReminder(updated)
+            if (updated.isEnabled) {
+                NotifierReceiver.scheduleReminder(getApplication(), updated)
+            } else {
+                NotifierReceiver.cancelReminder(getApplication(), updated.id)
+            }
+        }
+    }
 
-        // If currently enabled, re-schedule with new interval/message
-        if (_notifierEnabled.value) {
-            val app = getApplication<Application>()
-            com.example.receiver.NotifierReceiver.cancelNotification(app)
-            com.example.receiver.NotifierReceiver.scheduleNotification(app, intervalMinutes)
+    fun deleteReminder(reminder: Reminder) {
+        viewModelScope.launch {
+            NotifierReceiver.cancelReminder(getApplication(), reminder.id)
+            repository.deleteReminder(reminder.id)
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Daily Ratings & One-Sentence Summaries
+    // ------------------------------------------------------------------------
+    fun saveDailyRating(dateString: String, rating: Int, summary: String) {
+        viewModelScope.launch {
+            repository.insertDailyRating(DailyRating(dateString, rating, summary))
+        }
+    }
+
+    suspend fun getDailyRatingForDate(dateString: String): DailyRating? {
+        return repository.getDailyRating(dateString)
+    }
+
+    init {
+        // Restore active tracking session if any
+        val active = prefs.getString("active_activity", null)
+        val startTime = if (prefs.contains("active_activity_start_time")) prefs.getLong("active_activity_start_time", 0L) else null
+        if (active != null && startTime != null && startTime > 0) {
+            _activeActivity = MutableStateFlow(active)
+            _activeActivityStartTime = MutableStateFlow(startTime)
+            _activeActivitySeconds = MutableStateFlow((System.currentTimeMillis() - startTime) / 1000)
+            
+            trackerJob?.cancel()
+            trackerJob = viewModelScope.launch {
+                while (true) {
+                    delay(1000)
+                    _activeActivitySeconds.value = (System.currentTimeMillis() - startTime) / 1000
+                }
+            }
         }
     }
 
@@ -282,18 +343,16 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // ------------------------------------------------------------------------
-    // Real-Time Activity Tracking Engine
+    // Real-Time Activity Tracking Engine (Shared with Widget)
     // ------------------------------------------------------------------------
-    private val _activeActivity = MutableStateFlow<String?>(null)
-    val activeActivity: StateFlow<String?> = _activeActivity.asStateFlow()
 
-    private val _activeActivityStartTime = MutableStateFlow<Long?>(null)
-    val activeActivityStartTime: StateFlow<Long?> = _activeActivityStartTime.asStateFlow()
-
-    private val _activeActivitySeconds = MutableStateFlow(0L)
-    val activeActivitySeconds: StateFlow<Long> = _activeActivitySeconds.asStateFlow()
-
-    private var trackerJob: Job? = null
+    private fun updateWidget() {
+        val app = getApplication<Application>()
+        val intent = Intent(app, com.example.widget.TrackerWidgetProvider::class.java).apply {
+            action = "com.example.widget.UPDATE_WIDGET"
+        }
+        app.sendBroadcast(intent)
+    }
 
     fun startActivityTracking(activityName: String) {
         if (_activeActivity.value != null) {
@@ -304,6 +363,11 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         _activeActivityStartTime.value = now
         _activeActivitySeconds.value = 0L
 
+        prefs.edit()
+            .putString("active_activity", activityName)
+            .putLong("active_activity_start_time", now)
+            .apply()
+
         trackerJob?.cancel()
         trackerJob = viewModelScope.launch {
             while (true) {
@@ -311,12 +375,13 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                 _activeActivitySeconds.value = (System.currentTimeMillis() - now) / 1000
             }
         }
+        updateWidget()
     }
 
     fun stopAndLogActivity() {
         val name = _activeActivity.value ?: return
         val start = _activeActivityStartTime.value ?: return
-        val duration = _activeActivitySeconds.value
+        val duration = (System.currentTimeMillis() - start) / 1000
 
         trackerJob?.cancel()
         trackerJob = null
@@ -324,6 +389,11 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         _activeActivity.value = null
         _activeActivityStartTime.value = null
         _activeActivitySeconds.value = 0L
+
+        prefs.edit()
+            .remove("active_activity")
+            .remove("active_activity_start_time")
+            .apply()
 
         if (duration >= 1) { // Only log activities that ran for at least 1 second
             viewModelScope.launch {
@@ -336,6 +406,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
         }
+        updateWidget()
     }
 
     fun cancelActiveActivity() {
@@ -344,6 +415,12 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         _activeActivity.value = null
         _activeActivityStartTime.value = null
         _activeActivitySeconds.value = 0L
+
+        prefs.edit()
+            .remove("active_activity")
+            .remove("active_activity_start_time")
+            .apply()
+        updateWidget()
     }
 
     fun deleteActivityLog(logId: Int) {

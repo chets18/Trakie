@@ -1,3 +1,4 @@
+// Developer: Chetraj Jaishi
 package com.example
 
 import android.os.Bundle
@@ -21,8 +22,9 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
     setContent {
       val isDark by trackerViewModel.isDarkMode.collectAsStateWithLifecycle()
+      val isMonochrome by trackerViewModel.isMonochromeMode.collectAsStateWithLifecycle()
       
-      MyApplicationTheme(darkTheme = isDark) {
+      MyApplicationTheme(darkTheme = isDark, isMonochrome = isMonochrome) {
         MainTrackerScreen(viewModel = trackerViewModel, modifier = Modifier.fillMaxSize())
       }
     }

@@ -1,3 +1,4 @@
+// Developer: Chetraj Jaishi
 package com.example.ui
 
 import android.app.TimePickerDialog
@@ -72,6 +73,7 @@ fun MainTrackerScreen(
     var editingNote by remember { mutableStateOf<Note?>(null) }
     var isNewNoteDialogOpen by remember { mutableStateOf(false) }
     var isAlarmDialogOpen by remember { mutableStateOf(false) }
+    var isSettingsOpen by remember { mutableStateOf(false) }
 
     // System pickers
     val pickAudioLauncher = rememberLauncherForActivityResult(
@@ -172,6 +174,17 @@ fun MainTrackerScreen(
                             contentDescription = "Toggle Dark Mode",
                             tint = if (isDark) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.rotate(rotation)
+                        )
+                    }
+                    
+                    IconButton(
+                        onClick = { isSettingsOpen = true },
+                        modifier = Modifier.testTag("settings_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "App Settings",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
@@ -313,6 +326,88 @@ fun MainTrackerScreen(
             }
         )
     }
+
+    if (isSettingsOpen) {
+        SettingsDialog(
+            viewModel = viewModel,
+            onDismiss = { isSettingsOpen = false }
+        )
+    }
+}
+
+@Composable
+fun SettingsDialog(
+    viewModel: TrackerViewModel,
+    onDismiss: () -> Unit
+) {
+    val isMonochrome by viewModel.isMonochromeMode.collectAsStateWithLifecycle()
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("App Settings", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    text = "Personalize colors, styling, and locate resource paths.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                // Monochrome switch
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .clickable { viewModel.toggleMonochromeMode() }
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Monochrome Mode (B&W)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                        Text("Display the screen design in brutalist high-contrast grayscale.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = isMonochrome,
+                        onCheckedChange = { viewModel.toggleMonochromeMode() }
+                    )
+                }
+
+                // Info card for Logo replacement
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.2f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Info, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Logo Asset Customization", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "To customize the logo next to 'trakie', replace this file name inside your project's resource folders:\n\n• app/src/main/res/drawable/ic_launcher_foreground.xml",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Done")
+            }
+        }
+    )
 }
 
 // Extension to dynamically scale icons
@@ -335,7 +430,7 @@ fun ActivityMonitorTab(
     val durationSeconds by viewModel.activeActivitySeconds.collectAsStateWithLifecycle()
 
     var selectedPreset by remember { mutableStateOf("Studying") }
-    val presets = listOf("Studying", "Working", "Sleeping", "Exercising", "Meditating", "Leisure")
+    val presets = listOf("Studying", "Working", "Sleeping", "Traveling", "Exercising", "Meditating", "Leisure")
 
     val infiniteTransition = rememberInfiniteTransition(label = "RadarWave")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -884,28 +979,30 @@ fun MergedAlarmsTab(
 
 @Composable
 fun NotifierSection(viewModel: TrackerViewModel) {
-    val enabled by viewModel.notifierEnabled.collectAsStateWithLifecycle()
-    val currentInterval by viewModel.notifierIntervalMinutes.collectAsStateWithLifecycle()
-    val currentMessage by viewModel.notifierMessage.collectAsStateWithLifecycle()
-
-    var customMessage by remember(currentMessage) { mutableStateOf(currentMessage) }
-    var selectedInterval by remember(currentInterval) { mutableStateOf(currentInterval) }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        viewModel.toggleNotifier(true)
-    }
-
+    val reminders by viewModel.allReminders.collectAsStateWithLifecycle(initialValue = emptyList())
+    
+    var customTitle by remember { mutableStateOf("") }
+    var selectedInterval by remember { mutableStateOf(15) } // default 15 mins
+    
     val intervalOptions = listOf(
         1 to "1 Min",
         5 to "5 Mins",
         10 to "10 Mins",
-        20 to "20 Mins",
+        15 to "15 Mins",
         30 to "30 Mins",
-        60 to "1 Hour",
-        120 to "2 Hours"
+        60 to "1 Hour"
     )
+    
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ -> }
+    
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -914,167 +1011,141 @@ fun NotifierSection(viewModel: TrackerViewModel) {
             .padding(16.dp)
     ) {
         Text(
-            text = "Smart Interval Notifier",
+            text = "Multiple Custom Reminders",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "Receive custom reminders at regular intervals to maintain focus.",
+            text = "Configure custom notifications with unique intervals and sound alerts.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 20.dp)
+            modifier = Modifier.padding(bottom = 16.dp)
         )
-
-        // Status Card
+        
+        // Add Alert config Card
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = if (enabled) 4.dp else 0.dp),
-            border = if (!enabled) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (enabled) "NOTIFIER ACTIVE" else "NOTIFIER INACTIVE",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = if (enabled) "Reminding you every ${if (currentInterval >= 60) "${currentInterval/60} hrs" else "$currentInterval mins"}" else "Turn on to start interval updates",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = { isChecked ->
-                        if (isChecked) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                            } else {
-                                viewModel.toggleNotifier(true)
-                            }
-                        } else {
-                            viewModel.toggleNotifier(false)
-                        }
-                    }
-                )
-            }
-        }
-
-        // Settings Form Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    text = "Notification Message",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "A small one-sentence prompt for your notification.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Create Custom Alert", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                
                 OutlinedTextField(
-                    value = customMessage,
-                    onValueChange = { customMessage = it },
-                    placeholder = { Text("E.g., Reminding you to sip some water") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 20.dp),
+                    value = customTitle,
+                    onValueChange = { customTitle = it },
+                    placeholder = { Text("E.g., Stretch, Are you alive?, Focus check") },
+                    label = { Text("Alert keyword / Title") },
+                    singleLine = true,
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    modifier = Modifier.fillMaxWidth()
                 )
-
-                Text(
-                    text = "Select Time Interval",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "How often would you like to receive this?",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
-                // Select Interval Flow Row
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Text("Repeating Interval", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(6.dp))
+                
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(bottom = 24.dp),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     intervalOptions.forEach { (minutes, label) ->
                         val isSelected = selectedInterval == minutes
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .clickable { selectedInterval = minutes }
-                                .padding(horizontal = 16.dp, vertical = 10.dp)
-                        ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedInterval = minutes },
+                            label = { Text(label) },
+                            shape = RoundedCornerShape(8.dp)
+                        )
                     }
                 }
-
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 Button(
                     onClick = {
-                        viewModel.updateNotifierSettings(selectedInterval, customMessage)
+                        val finalTitle = customTitle.trim().ifEmpty { "Self Check" }
+                        viewModel.addReminder(finalTitle, selectedInterval)
+                        customTitle = "" // clear inputs
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White
-                    )
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Filled.Save, contentDescription = null)
+                    Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Apply Notifier Settings", fontWeight = FontWeight.Bold)
+                    Text("Add Focus Alert", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        
+        Text(
+            text = "Configured Alerts (${reminders.size})",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        
+        if (reminders.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(0.3f)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Text("No alerts created. Add one above!", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                reminders.forEach { reminder ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (reminder.isEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = reminder.title,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (reminder.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Timer, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Repeats: Every ${reminder.intervalMinutes} mins",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Switch(
+                                    checked = reminder.isEnabled,
+                                    onCheckedChange = { viewModel.toggleReminder(reminder) }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(onClick = { viewModel.deleteReminder(reminder) }) {
+                                    Icon(Icons.Default.DeleteOutline, "Remove Tracker", tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1588,8 +1659,9 @@ private val Color.Companion.white: Color
     get() = Color.White
 
 // ============================================================================
-// TAB 4: Notion style Notes View
+// TAB 3: Dual View Notes & Statistics Reports Screen
 // ============================================================================
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun NotesTab(
     viewModel: TrackerViewModel,
@@ -1597,6 +1669,7 @@ fun NotesTab(
     onCreateNewNote: () -> Unit,
     onEditNote: (Note) -> Unit
 ) {
+    var notesSubTab by remember { mutableStateOf(0) } // 0 = documents list, 1 = daily stats summaries
     var searchQuery by remember { mutableStateOf("") }
     val filteredNotes = remember(searchQuery, notes) {
         if (searchQuery.isEmpty()) notes else {
@@ -1606,6 +1679,8 @@ fun NotesTab(
             }
         }
     }
+
+    val logs by viewModel.allActivityLogs.collectAsStateWithLifecycle(initialValue = emptyList())
 
     // Confirmation dialog states for deleting a note
     var noteToDelete by remember { mutableStateOf<Note?>(null) }
@@ -1669,93 +1744,389 @@ fun NotesTab(
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // Horizontal Sub-tabs selectors
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(bottom = 16.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Column {
-                Text(
-                    text = "Rich Notes",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Notion structure demo. Image attachments.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            IconButton(
-                onClick = onCreateNewNote,
-                colors = IconButtonDefaults.iconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ),
-                modifier = Modifier
-                    .size(48.dp)
-                    .testTag("add_note_fab")
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "New Note")
+            val subTabs = listOf("Note Documents", "Daily Logs & Stats")
+            subTabs.forEachIndexed { index, title ->
+                val isSelected = notesSubTab == index
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                        .clickable { notesSubTab = index }
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
-        // Search Bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search title, body content...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
-            )
-        )
-
-        if (filteredNotes.isEmpty()) {
-            Box(
+        if (notesSubTab == 0) {
+            // Document explorer (Existing List)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Outlined.StickyNote2,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(72.dp)
-                            .padding(bottom = 12.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.35f)
+                Column {
+                    Text(
+                        text = "Rich Notes",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text("No local documents found", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("Secure, fully private client-side database storage.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = "Fully local rich text formatting with photo support.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                IconButton(
+                    onClick = onCreateNewNote,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag("add_note_fab")
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "New Note")
+                }
+            }
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search document title, body contents...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+
+            if (filteredNotes.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Outlined.StickyNote2,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(72.dp)
+                                .padding(bottom = 12.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.35f)
+                        )
+                        Text("No notes found", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("Keep private notes client-side forever.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    items(filteredNotes, key = { it.id }) { note ->
+                        NoteItemCard(
+                            note = note,
+                            onEdit = { onEditNote(note) },
+                            onDelete = {
+                                noteToDelete = note
+                                typedConfirmationText = ""
+                            }
+                        )
+                    }
                 }
             }
         } else {
-            // Elegant Grid/List layout
+            // Statistics, custom daily rating logs and compare graphs view!
+            var selectedDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+            val sdfDay = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+            val selectedDateStr = remember(selectedDateMillis) { sdfDay.format(Date(selectedDateMillis)) }
+            
+            var ratingVal by remember { mutableStateOf(0) }
+            var sentenceSummaryText by remember { mutableStateOf("") }
+
+            LaunchedEffect(selectedDateStr) {
+                val activeRatingAndSummary = viewModel.getDailyRatingForDate(selectedDateStr)
+                ratingVal = activeRatingAndSummary?.rating ?: 0
+                sentenceSummaryText = activeRatingAndSummary?.oneSentenceSummary ?: ""
+            }
+
+            // Persist ratings updates
+            LaunchedEffect(ratingVal, sentenceSummaryText) {
+                if (ratingVal > 0 || sentenceSummaryText.isNotEmpty()) {
+                    kotlinx.coroutines.delay(300) // Debounce saving with fully-qualified delay to prevent import error
+                    viewModel.saveDailyRating(selectedDateStr, ratingVal, sentenceSummaryText)
+                }
+            }
+
+            val logsOfDay = remember(logs, selectedDateStr) {
+                logs.filter { sdfDay.format(Date(it.startTime)) == selectedDateStr }
+            }
+
+            val chronologicalLogsWithGaps = remember(logsOfDay, selectedDateMillis) {
+                val result = mutableListOf<Triple<String, Long, Long>>() // name, startMillis, durationSecs
+                if (logsOfDay.isEmpty()) {
+                    result.add(Triple("Unaccounted Gap", selectedDateMillis, 86400L))
+                    return@remember result
+                }
+                val sorted = logsOfDay.sortedBy { it.startTime }
+                val cal = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                val dayStart = cal.timeInMillis
+                val dayEnd = dayStart + 86400000L
+                
+                var currentPointer = dayStart
+                
+                sorted.forEach { log ->
+                    if (log.startTime - currentPointer >= 1800000L) {
+                        val gap = (log.startTime - currentPointer) / 1000
+                        result.add(Triple("Unaccounted Gap", currentPointer, gap))
+                    }
+                    result.add(Triple(log.activityName, log.startTime, log.durationSeconds))
+                    currentPointer = log.startTime + (log.durationSeconds * 1000)
+                }
+                
+                if (dayEnd - currentPointer >= 1800000L) {
+                    val gap = (dayEnd - currentPointer) / 1000
+                    result.add(Triple("Unaccounted Gap", currentPointer, gap))
+                }
+                result
+            }
+
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(filteredNotes, key = { it.id }) { note ->
-                    NoteItemCard(
-                        note = note,
-                        onEdit = { onEditNote(note) },
-                        onDelete = {
-                            noteToDelete = note
-                            typedConfirmationText = ""
+                // Header Date Navigator
+                item {
+                    val formattedDate = remember(selectedDateMillis) {
+                        SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.getDefault()).format(Date(selectedDateMillis))
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { selectedDateMillis -= 24 * 60 * 60 * 1000L }) {
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Prev Day")
+                            }
+                            Text(
+                                text = formattedDate,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            IconButton(onClick = { selectedDateMillis += 24 * 60 * 60 * 1000L }) {
+                                Icon(Icons.Default.ArrowForward, contentDescription = "Next Day")
+                            }
                         }
-                    )
+                    }
+                }
+
+                // 24 Hour Segment Visualizer
+                item {
+                    Daily24HourBar(logsOfDay = logsOfDay)
+                }
+
+                // Daily Evaluation score card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("How was your day? (1 - 10)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("Rate and log a quick private summary.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(12.dp))
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                (1..10).forEach { score ->
+                                    val isSelected = ratingVal == score
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                                            .clickable { ratingVal = score }
+                                    ) {
+                                        Text(
+                                            text = score.toString(),
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            
+                            OutlinedTextField(
+                                value = sentenceSummaryText,
+                                onValueChange = { sentenceSummaryText = it },
+                                placeholder = { Text("Write your one sentence summary...") },
+                                label = { Text("One Sentence Summary") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+
+                // Chronological items including Unaccounted spaces
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Timeline Logs", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(8.dp))
+                            
+                            chronologicalLogsWithGaps.forEach { (name, start, duration) ->
+                                val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(start))
+                                val durationStr = if (duration >= 3600L) {
+                                    String.format(Locale.US, "%.1f hrs", duration / 3600f)
+                                } else {
+                                    "${duration / 60} mins"
+                                }
+                                
+                                val isGap = name == "Unaccounted Gap"
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 6.dp)
+                                        .background(
+                                            color = if (isGap) MaterialTheme.colorScheme.errorContainer.copy(0.2f) else Color.Transparent,
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isGap) Color(0xFFEF4444) else MaterialTheme.colorScheme.primary)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = if (isGap) "Unaccounted Free Time" else name,
+                                                fontWeight = FontWeight.SemiBold,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = if (isGap) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = "Started: $timeFormat",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(if (isGap) Color(0xFFFEE2E2) else MaterialTheme.colorScheme.primaryContainer)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = durationStr,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (isGap) Color(0xFFEF4444) else MaterialTheme.colorScheme.onPrimaryContainer,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Streaks & Best day highlights Card
+                item {
+                    val bestDayStr = remember(logs) { calculateBestFocusedDay(logs) }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Stats & Streaks Highlight", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text(text = bestDayStr, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 4.dp))
+                            
+                            Spacer(Modifier.height(8.dp))
+                            Text("Current log streak by category:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(6.dp))
+                            
+                            val categories = listOf("Studying", "Working", "Sleeping", "Traveling", "Exercising", "Meditating")
+                            categories.forEach { cat ->
+                                val streak = remember(logs) { calculateStreakForCategory(logs, cat) }
+                                if (streak > 0) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(cat, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                        Text("🔥 $streak Days Streak", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Comparable comparison graph canvas!
+                item {
+                    MonthlyMultiLineGraph(logs = logs)
                 }
             }
         }
@@ -1877,7 +2248,7 @@ fun NoteItemCard(
 }
 
 // ============================================================================
-// MODAL: Rich Notion style Note Editor Creator
+// MODAL: Rich Notion style Note Editor Creator (Full Screen, Auto-Saving)
 // ============================================================================
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -1895,6 +2266,8 @@ fun NoteEditorDialog(
     var isItalic by remember { mutableStateOf(note?.isItalic ?: false) }
     var isUnderlined by remember { mutableStateOf(note?.isUnderlined ?: false) }
     var imageUrl by remember { mutableStateOf<String?>(note?.imageUrl) }
+    
+    var isHighlighted by remember { mutableStateOf(note?.title?.startsWith("[HL]") == true || note?.content?.startsWith("[HL]") == true) }
 
     val context = LocalContext.current
 
@@ -1910,70 +2283,111 @@ fun NoteEditorDialog(
                     )
                 }
             } catch (e: Exception) {
-                // permission taken to read
             }
             imageUrl = it.toString()
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    // Debounced Auto-save
+    LaunchedEffect(title, content, fontSize, fontFamily, isBold, isItalic, isUnderlined, imageUrl) {
+        if (title.isEmpty() && content.isEmpty() && note == null) return@LaunchedEffect
+        kotlinx.coroutines.delay(800)
+        onSave(title, content, fontSize, fontFamily, isBold, isItalic, isUnderlined, imageUrl)
+    }
+
+    // Capture standard Back button mapping
+    androidx.activity.compose.BackHandler {
+        onSave(title, content, fontSize, fontFamily, isBold, isItalic, isUnderlined, imageUrl)
+        onDismiss()
+    }
+
+    Dialog(
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false
+        ),
+        onDismissRequest = {
+            onSave(title, content, fontSize, fontFamily, isBold, isItalic, isUnderlined, imageUrl)
+            onDismiss()
+        }
+    ) {
         Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.95f),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
+            modifier = Modifier.fillMaxSize(),
+            color = if (isHighlighted) Color(0xFFFEF08A).copy(alpha = 0.96f) else MaterialTheme.colorScheme.background
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp)
+                    .padding(16.dp)
             ) {
-                // Header
+                // Toolbar Header Row
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(
+                        onClick = {
+                            onSave(title, content, fontSize, fontFamily, isBold, isItalic, isUnderlined, imageUrl)
+                            onDismiss()
+                        }
+                    ) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Save and Close")
+                    }
+
                     Text(
-                        text = if (note == null) "Create Note" else "Edit Note",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        text = if (note == null) "New Note (Auto-save)" else "Edit Note (Auto-save)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close window")
+                    Row {
+                        IconToggleButton(
+                            checked = isHighlighted,
+                            onCheckedChange = { isHighlighted = it }
+                        ) {
+                            Icon(
+                                imageVector = if (isHighlighted) Icons.Filled.BorderColor else Icons.Outlined.BorderColor,
+                                contentDescription = "Highlight",
+                                tint = if (isHighlighted) Color(0xFFEAB308) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        IconButton(onClick = { pickImageLauncher.launch(arrayOf("image/*")) }) {
+                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Add image attachment")
+                        }
                     }
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Scrollable workspace editor
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // Title Editor
+                    // Document Title
                     TextField(
                         value = title,
                         onValueChange = { title = it },
                         placeholder = { 
                             Text(
                                 "Document Title",
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                             )
                         },
-                        textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        textStyle = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp)
                             .testTag("note_title_input"),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -1984,82 +2398,48 @@ fun NoteEditorDialog(
                         )
                     )
 
-                    Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Nottingham Rich-text Style Toolbar
+                    // Inner Styling Toolbar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp)
+                            .padding(vertical = 4.dp)
                             .horizontalScroll(rememberScrollState()),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Bold Toggle
-                        IconToggleButton(
-                            checked = isBold,
-                            onCheckedChange = { isBold = it },
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.FormatBold,
-                                contentDescription = "Bold Toggle",
-                                tint = if (isBold) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        IconToggleButton(checked = isBold, onCheckedChange = { isBold = it }) {
+                            Icon(Icons.Default.FormatBold, null, tint = if (isBold) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
-                        // Italic Toggle
-                        IconToggleButton(
-                            checked = isItalic,
-                            onCheckedChange = { isItalic = it },
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.FormatItalic,
-                                contentDescription = "Italic Toggle",
-                                tint = if (isItalic) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        IconToggleButton(checked = isItalic, onCheckedChange = { isItalic = it }) {
+                            Icon(Icons.Default.FormatItalic, null, tint = if (isItalic) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
-                        // Underline Toggle
-                        IconToggleButton(
-                            checked = isUnderlined,
-                            onCheckedChange = { isUnderlined = it },
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.FormatUnderlined,
-                                contentDescription = "Underline Toggle",
-                                tint = if (isUnderlined) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        IconToggleButton(checked = isUnderlined, onCheckedChange = { isUnderlined = it }) {
+                            Icon(Icons.Default.FormatUnderlined, null, tint = if (isUnderlined) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
-                        Spacer(Modifier.width(4.dp))
-
-                        // Font sizing increments picker (14, 16, 20, 24)
                         Text(
                             text = "${fontSize}sp",
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier
                                 .clickable {
                                     fontSize = when (fontSize) {
-                                        14 -> 17
-                                        17 -> 22
-                                        22 -> 28
+                                        14 -> 18
+                                        18 -> 24
                                         else -> 14
                                     }
                                 }
                                 .padding(horizontal = 8.dp, vertical = 6.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                         )
 
-                        Spacer(Modifier.width(4.dp))
-
-                        // FontFamily Selector
                         Text(
                             text = fontFamily,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier
                                 .clickable {
@@ -2070,73 +2450,71 @@ fun NoteEditorDialog(
                                     }
                                 }
                                 .padding(horizontal = 8.dp, vertical = 6.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                         )
 
-                        // Spacer
-                        Spacer(Modifier.width(4.dp))
-
-                        // Image Attachment Picker
-                        IconButton(
-                            onClick = { pickImageLauncher.launch(arrayOf("image/*")) },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (imageUrl != null) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                            )
+                        // BULLET LIST HOOKS
+                        Button(
+                            onClick = {
+                                content = if (content.endsWith("\n") || content.isEmpty()) {
+                                    content + "• "
+                                } else {
+                                    content + "\n• "
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(32.dp)
                         ) {
-                            Icon(
-                                Icons.Default.AddPhotoAlternate,
-                                contentDescription = "Insert Image attachment"
-                            )
+                            Icon(Icons.Default.FormatListBulleted, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Spacer(Modifier.width(4.dp))
+                            Text("List", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
                     }
 
-                    Divider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(bottom = 12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
 
-                    // Optional Display attached Image
                     if (imageUrl != null) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(160.dp)
-                                .clip(RoundedCornerShape(14.dp))
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(16.dp))
                         ) {
                             AsyncImage(
                                 model = Uri.parse(imageUrl),
-                                contentDescription = "Added document photo attachment",
+                                contentDescription = "Photo Attachment",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
-
-                            // Clear button overlay top right
                             IconButton(
                                 onClick = { imageUrl = null },
                                 colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(0.6f)),
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
                                     .padding(8.dp)
-                                    .size(30.dp)
                             ) {
-                                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Close, null, tint = Color.White)
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
 
-                    // Body content editor
+                    // Body
                     TextField(
                         value = content,
                         onValueChange = { content = it },
                         placeholder = {
                             Text(
-                                "Write your thoughts here...",
+                                "Body text goes here...",
                                 style = androidx.compose.ui.text.TextStyle(
                                     fontSize = fontSize.sp,
                                     fontFamily = when (fontFamily) {
                                         "Serif" -> FontFamily.Serif
                                         "Monospace" -> FontFamily.Monospace
                                         else -> FontFamily.SansSerif
-                                    },
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                    }
                                 )
                             )
                         },
@@ -2154,7 +2532,7 @@ fun NoteEditorDialog(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 180.dp)
+                            .heightIn(min = 280.dp)
                             .testTag("note_body_input"),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -2166,19 +2544,46 @@ fun NoteEditorDialog(
                     )
                 }
 
-                Spacer(Modifier.height(12.dp))
+                // FOOTER
+                val wordCount = remember(content) {
+                    content.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+                }
+                val charCount = content.length
 
-                // Action controls at bottom
-                Button(
-                    onClick = { onSave(title, content, fontSize, fontFamily, isBold, isItalic, isUnderlined, imageUrl) },
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("note_save_button")
+                        .navigationBarsPadding(),
+                    color = Color.Transparent
                 ) {
-                    Icon(Icons.Filled.Check, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Save Note", fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "$wordCount words  |  $charCount characters",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f)
+                        )
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Filled.CloudDone,
+                                contentDescription = null,
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                "Changes Saved",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF10B981)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2384,4 +2789,293 @@ fun AlarmCreatorDialog(
             }
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun Daily24HourBar(logsOfDay: List<ActivityLog>) {
+    val segments = remember(logsOfDay) {
+        val colors = MutableList(24) { Color(0xFF64748B) } // Default inactive slate
+        
+        logsOfDay.forEach { log ->
+            val cal = Calendar.getInstance().apply { timeInMillis = log.startTime }
+            val startHour = cal.get(Calendar.HOUR_OF_DAY)
+            val durationHours = (log.durationSeconds / 3600f).coerceAtLeast(1f).toInt()
+            
+            for (h in startHour until (startHour + durationHours).coerceAtMost(24)) {
+                colors[h] = when (log.activityName) {
+                    "Studying" -> Color(0xFF6366F1)
+                    "Working" -> Color(0xFF10B981)
+                    "Sleeping" -> Color(0xFF3B82F6)
+                    "Traveling" -> Color(0xFFEC4899)
+                    "Exercising" -> Color(0xFFF59E0B)
+                    "Meditating" -> Color(0xFF8B5CF6)
+                    else -> Color(0xFF14B8A6)
+                }
+            }
+        }
+        colors
+    }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(0.3f), RoundedCornerShape(16.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+            .padding(12.dp)
+    ) {
+        Text(
+            text = "24-Hour Active Segment Bar",
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            segments.forEach { color ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(color)
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("12 AM", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+            Text("6 AM", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+            Text("12 PM", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+            Text("6 PM", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+            Text("12 AM", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+        }
+        
+        Spacer(modifier = Modifier.height(10.dp))
+        
+        // Legends
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            listOf("Studying", "Working", "Sleeping", "Traveling", "Exercising", "Meditating").forEach { cat ->
+                val col = when (cat) {
+                    "Studying" -> Color(0xFF6366F1)
+                    "Working" -> Color(0xFF10B981)
+                    "Sleeping" -> Color(0xFF3B82F6)
+                    "Traveling" -> Color(0xFFEC4899)
+                    "Exercising" -> Color(0xFFF59E0B)
+                    "Meditating" -> Color(0xFF8B5CF6)
+                    else -> Color(0xFF14B8A6)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(col))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(cat, style = MaterialTheme.typography.bodySmall, fontSize = 10.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MonthlyMultiLineGraph(logs: List<ActivityLog>) {
+    val categories = listOf("Studying", "Working", "Sleeping", "Traveling", "Exercising", "Meditating")
+    
+    val pointsBySub = remember(logs) {
+        val sdf = SimpleDateFormat("MM-dd", Locale.getDefault())
+        
+        val past30Days = (0..29).map { offset ->
+            val c = Calendar.getInstance()
+            c.add(Calendar.DAY_OF_YEAR, -offset)
+            sdf.format(c.time)
+        }.reversed()
+        
+        val pointsRaw = categories.associateWith { cat ->
+            val catLogs = logs.filter { it.activityName == cat }
+            val groupedByDay = catLogs.groupBy { 
+                val c = Calendar.getInstance().apply { timeInMillis = it.startTime }
+                sdf.format(c.time)
+            }
+            
+            past30Days.map { day ->
+                val dayLogs = groupedByDay[day] ?: emptyList()
+                dayLogs.sumOf { it.durationSeconds } / 3600f
+            }
+        }
+        Triple(past30Days, pointsRaw, logs.size)
+    }
+    
+    val dataByCat = pointsBySub.second
+    
+    val categoryColors = mapOf(
+        "Studying" to Color(0xFF6366F1),
+        "Working" to Color(0xFF10B981),
+        "Sleeping" to Color(0xFF3B82F6),
+        "Traveling" to Color(0xFFEC4899),
+        "Exercising" to Color(0xFFF59E0B),
+        "Meditating" to Color(0xFF8B5CF6)
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(300.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Monthly Comparison Lines", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Text("Hours logged per activity over the past 30 days.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(16.dp))
+            
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                Canvas(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    val width = size.width
+                    val height = size.height
+                    val paddingLeft = 40f
+                    val paddingRight = 16f
+                    val paddingTop = 16f
+                    val paddingBottom = 32f
+                    
+                    val graphWidth = width - paddingLeft - paddingRight
+                    val graphHeight = height - paddingTop - paddingBottom
+                    
+                    val yLabels = listOf(0f, 4f, 8f, 12f, 16f)
+                    val maxY = 16f
+                    
+                    yLabels.forEach { hours ->
+                        val y = paddingTop + graphHeight * (1f - (hours / maxY))
+                        drawLine(
+                            color = Color.LightGray.copy(alpha = 0.35f),
+                            start = Offset(paddingLeft, y),
+                            end = Offset(width - paddingRight, y),
+                            strokeWidth = 1f
+                        )
+                    }
+                    
+                    categories.forEach { cat ->
+                        val color = categoryColors[cat] ?: Color.Gray
+                        val hoursList = dataByCat[cat] ?: List(30) { 0f }
+                        
+                        val points = hoursList.mapIndexed { index, hour ->
+                            val x = paddingLeft + (index / 29f) * graphWidth
+                            val y = paddingTop + graphHeight * (1f - (hour.coerceAtMost(maxY) / maxY))
+                            Offset(x, y)
+                        }
+                        
+                        for (i in 0 until points.size - 1) {
+                            drawLine(
+                                color = color,
+                                start = points[i],
+                                end = points[i+1],
+                                strokeWidth = 3.5f,
+                                cap = StrokeCap.Round
+                            )
+                        }
+                    }
+                    
+                    drawLine(
+                        color = Color.LightGray.copy(alpha = 0.5f),
+                        start = Offset(paddingLeft, paddingTop),
+                        end = Offset(paddingLeft, height - paddingBottom),
+                        strokeWidth = 2f
+                    )
+                    
+                    drawLine(
+                        color = Color.LightGray.copy(alpha = 0.5f),
+                        start = Offset(paddingLeft, height - paddingBottom),
+                        end = Offset(width - paddingRight, height - paddingBottom),
+                        strokeWidth = 2f
+                    )
+                }
+            }
+            
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("30 Days Ago", fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                Text("15 Days Ago", fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                Text("Today", fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+            }
+        }
+    }
+}
+
+fun calculateBestFocusedDay(logs: List<ActivityLog>): String {
+    val cal = Calendar.getInstance()
+    val rawMap = logs.groupBy { 
+        cal.timeInMillis = it.startTime
+        cal.get(Calendar.DAY_OF_YEAR) to cal.get(Calendar.YEAR)
+    }
+    
+    var maxSeconds = 0L
+    var bestDayStr = ""
+    val sdf = SimpleDateFormat("MMMM d", Locale.getDefault())
+    
+    rawMap.forEach { (key, group) ->
+        val totalSecs = group.sumOf { it.durationSeconds }
+        if (totalSecs > maxSeconds) {
+            maxSeconds = totalSecs
+            val firstLog = group.first()
+            bestDayStr = sdf.format(Date(firstLog.startTime))
+        }
+    }
+    
+    val totalHrsFormat = String.format(Locale.US, "%.1f", maxSeconds / 3600f)
+    return if (maxSeconds > 0) {
+        "Your best day was $bestDayStr with $totalHrsFormat hours tracked."
+    } else {
+        "Start tracking activities to calculate your best focused day!"
+    }
+}
+
+fun calculateStreakForCategory(logs: List<ActivityLog>, category: String): Int {
+    val catLogs = logs.filter { it.activityName == category }
+    if (catLogs.isEmpty()) return 0
+    
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val dates = catLogs.map { sdf.format(Date(it.startTime)) }.toSet()
+    
+    var streak = 0
+    val cal = Calendar.getInstance()
+    
+    while (true) {
+        val dateStr = sdf.format(cal.time)
+        if (dates.contains(dateStr)) {
+            streak++
+            cal.add(Calendar.DAY_OF_YEAR, -1)
+        } else {
+            if (streak == 0) {
+                cal.add(Calendar.DAY_OF_YEAR, -1)
+                val yesterdayStr = sdf.format(cal.time)
+                if (dates.contains(yesterdayStr)) {
+                    streak++
+                    cal.add(Calendar.DAY_OF_YEAR, -1)
+                    continue
+                }
+            }
+            break
+        }
+    }
+    return streak
 }

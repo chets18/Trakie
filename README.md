@@ -1,56 +1,58 @@
-  <h1>Trakie</h1>
+# trakie 
+
+trakie is a beautiful, private, and fully offline-first personal dashboard built with Jetpack Compose, Material Design 3, and Kotlin Coroutines. It blends real-time activity logging, Notion-style document drafting, custom reminder sequences, and rich local telemetry charts into one unified application. 
 
 ---
 
-## 📖 About the Project
+## 🎨 Design Philosophy & Visuals
 
-**Trakie** is a robust Android application developed to provide a seamless and intelligent user experience. Built with the latest Android development standards, it leverages modern architecture and powerful libraries to ensure performance, maintainability, and a highly responsive user interface.
-
-## 🛠️ Tech Stack
-
-This project is built using the following modern Android development tools and libraries:
-
-*   **Language:** [Kotlin](https://kotlinlang.org/) - Modern, expressive, and safe programming language.
-*   **UI Framework:** [Jetpack Compose](https://developer.android.com/jetpack/compose) - Android’s modern toolkit for building native UI declaratively.
-*   **Architecture & Navigation:** 
-    *   [Navigation Compose](https://developer.android.com/jetpack/compose/navigation) for seamless transitions and type-safe routing.
-    *   [ViewModel & Lifecycle](https://developer.android.com/topic/libraries/architecture/viewmodel) for lifecycle-aware data management.
-*   **Asynchronous Programming:** [Coroutines](https://kotlinlang.org/docs/coroutines-overview.html) and [Flow](https://kotlinlang.org/docs/flow.html) for asynchronous operations and reactive streams.
-*   **Local Storage:** 
-    *   [Room Database](https://developer.android.com/training/data-storage/room) for robust local SQLite data persistence.
-    *   [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) for typed and asynchronous preference storage.
-*   **Networking & APIs:** 
-    *   [Retrofit](https://square.github.io/retrofit/) & [OkHttp](https://square.github.io/okhttp/) for type-safe REST API communication.
-    *   [Moshi](https://github.com/square/moshi) for JSON serialization/deserialization.
-*   **Image Loading:** [Coil](https://coil-kt.github.io/coil/) - Image loading for Android backed by Kotlin Coroutines.
-*   **Hardware & Sensors:**
-    *   [CameraX](https://developer.android.com/training/camerax) for consistent and reliable camera experiences.
-    *   [Play Services Location](https://developers.google.com/android/reference/com/google/android/gms/location/package-summary) for advanced location tracking.
-*   **AI Integration:** [Firebase AI / BoM](https://firebase.google.com/) for intelligent, machine-learning-driven features.
-*   **Permissions:** [Accompanist Permissions](https://google.github.io/accompanist/permissions/) for declarative permission handling in Compose.
-*   **Testing:** JUnit 4, Espresso, Robolectric, and Roborazzi for comprehensive unit, UI, and snapshot testing.
+- **Modern Slate & Grayscale Identity**: Supports system dark theme, Google's Material 3 Dynamic colors, and a brutalist **High-Contrast Monochrome Grayscale Mode** for a focused, distraction-free environment.
+- **Micro-interactions & Visual Pace**: Smooth rotary and fade animations, infinite loading waves for active tracking, custom high-contrast notes highlighter schemes, and beautiful negative-spaced vector iconography.
 
 ---
 
-## 🚀 Run Locally
+## Key Functional Modules
 
-**Prerequisites:** [Android Studio](https://developer.android.com/studio) (latest version recommended).
+### 1. Real-Time Activity Tracking Engine
+* **Flexible Presets**: Track activities like Studying, Working, Sleeping, Traveling, Exercising, Meditating, or Leisure instantly.
+* **Persistent Counter**: Seamless real-time calculation of active duration with high-performance coroutine tick states.
+* **Smart Homescreen Integration**: Uses a modern Android App Widget to keep track of your performance direct from the launcher screen.
 
-Follow these steps to run the application on your local machine:
+### 2. Tab 3: Dual-View Explorer (Notion Notes & Statistics)
+* **Notion-Style Notes Document Editor**:
+  * Rich physical styling toggles (Bold, Italic, Underline).
+  * Auto-adjusting font-sizing presets and typography families (Sans-Serif, Serif, Monospace).
+  * Direct bullet list hooks and Uri image photo attachments.
+  * Debounced asynchronous backing database auto-save with a fully mapped back-button capture.
+  * Live document analytics: Real-time word and character counters.
+* **Daily Rating & Evaluation Logs**:
+  * Complete score analysis on a 1-to-10 scale per calendar date.
+  * Quick one-sentence summaries logged safely on local storage.
+* **24-Hour Segment Visualizer**:
+  * Chronological color-coded segment grids dividing any calendar day into active segments.
+  * Instant automatic calculation and warning flags highlighting "Unaccounted Free Time Gaps."
+* **Advanced Analytics & Multi-Line Plotting**:
+  * Customized drawing canvas rendering local multi-line comparison graphs for the past 30 days.
+  * Streak metrics showing consecutive days logged per activity category.
 
-1. **Open Android Studio**.
-2. Select **Open** and choose the directory containing this project.
-3. Allow Android Studio to sync the Gradle project and fix any incompatibilities as it imports.
-4. **Configure API Keys:** 
-   * Create a file named `.env` in the root project directory.
-   * Add your API key: `API_KEY=your_api_key_here` (refer to `.env.example` for guidance).
-5. **Adjust Build Settings:** 
-   * Open the app-level `build.gradle.kts` file.
-   * Remove or comment out this line (if present and causing issues): `signingConfig = signingConfigs.getByName("debugConfig")`
-6. **Run the App:** Click the **Run** button (or press `Shift + F10`) to deploy the app on an emulator or a connected physical Android device.
+### 3. Smart Interval Notifier (Reminders)
+* Configure multiple concurrent alerts with unique repeat frequencies (1 Min, 5 Mins, 15 Mins, 30 Mins, 1 Hour).
+* Toggle custom alarm keywords (e.g., "Are you focused?, Stretch, Drink Water") to maintain physical and cognitive wellness.
 
 ---
 
-<div align="right">
-  <sub><i>Note: I used AI in order to complete this project.</i></sub>
-</div>
+## ⚙️ Architecture & Local Stack
+
+- **UI Framework**: Jetpack Compose (Kotlin) styled with full edge-to-edge system insets, custom scaffold paddings, and cohesive M3 attributes.
+- **Local Persistence Layer**: Fully client-side Room Database using Kotlin Symbol Processing (KSP) and safe background Coroutine Flows to query note files, active logs, daily ratings, and reminders in real-time.
+- **Verification Engine**: Tested via standard unit testing, Android Roborazzi, and local JVM Robolectric controllers.
+
+---
+
+## 📁 Customizing Visual Assets
+
+To customize the default vector identity next to 'trakie', replace this resource path inside your Android project:
+```path
+app/src/main/res/drawable/ic_launcher_foreground.xml
+
+**Note:** The developer of this application is me; Chetraj and gemini.

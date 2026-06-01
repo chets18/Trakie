@@ -1,3 +1,4 @@
+// Developer: Chetraj Jaishi
 package com.example.data
 
 import android.content.Context
@@ -84,11 +85,55 @@ interface ActivityLogDao {
     suspend fun deleteActivityLogById(id: Int)
 }
 
-@Database(entities = [Note::class, Alarm::class, ActivityLog::class], version = 1, exportSchema = false)
+@Entity(tableName = "reminders")
+data class Reminder(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val title: String,
+    val intervalMinutes: Int,
+    val isEnabled: Boolean = true
+)
+
+@Entity(tableName = "daily_ratings")
+data class DailyRating(
+    @PrimaryKey val dateString: String, // "yyyy-MM-dd"
+    val rating: Int, // 1 to 10
+    val oneSentenceSummary: String = ""
+)
+
+@Dao
+interface ReminderDao {
+    @Query("SELECT * FROM reminders ORDER BY id DESC")
+    fun getAllReminders(): Flow<List<Reminder>>
+
+    @Query("SELECT * FROM reminders WHERE isEnabled = 1")
+    suspend fun getActiveReminders(): List<Reminder>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReminder(reminder: Reminder): Long
+
+    @Query("DELETE FROM reminders WHERE id = :id")
+    suspend fun deleteReminderById(id: Int)
+}
+
+@Dao
+interface DailyRatingDao {
+    @Query("SELECT * FROM daily_ratings WHERE dateString = :dateString")
+    suspend fun getDailyRating(dateString: String): DailyRating?
+
+    @Query("SELECT * FROM daily_ratings ORDER BY dateString DESC")
+    fun getAllDailyRatings(): Flow<List<DailyRating>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDailyRating(rating: DailyRating)
+}
+
+@Database(entities = [Note::class, Alarm::class, ActivityLog::class, Reminder::class, DailyRating::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract val noteDao: NoteDao
     abstract val alarmDao: AlarmDao
     abstract val activityLogDao: ActivityLogDao
+    abstract val reminderDao: ReminderDao
+    abstract val dailyRatingDao: DailyRatingDao
 
     companion object {
         @Volatile
@@ -122,4 +167,12 @@ class TrackerRepository(private val db: AppDatabase) {
     val allActivityLogs: Flow<List<ActivityLog>> = db.activityLogDao.getAllActivityLogs()
     suspend fun insertActivityLog(log: ActivityLog) = db.activityLogDao.insertActivityLog(log)
     suspend fun deleteActivityLog(id: Int) = db.activityLogDao.deleteActivityLogById(id)
+
+    val allReminders: Flow<List<Reminder>> = db.reminderDao.getAllReminders()
+    suspend fun insertReminder(reminder: Reminder): Long = db.reminderDao.insertReminder(reminder)
+    suspend fun deleteReminder(id: Int) = db.reminderDao.deleteReminderById(id)
+
+    val allDailyRatings: Flow<List<DailyRating>> = db.dailyRatingDao.getAllDailyRatings()
+    suspend fun insertDailyRating(rating: DailyRating) = db.dailyRatingDao.insertDailyRating(rating)
+    suspend fun getDailyRating(dateString: String): DailyRating? = db.dailyRatingDao.getDailyRating(dateString)
 }
