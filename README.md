@@ -9,6 +9,21 @@ trakie is a beautiful, private, and fully offline-first personal dashboard built
 - **Modern Slate & Grayscale Identity**: Supports system dark theme, Google's Material 3 Dynamic colors, and a brutalist **High-Contrast Monochrome Grayscale Mode** for a focused, distraction-free environment.
 - **Micro-interactions & Visual Pace**: Smooth rotary and fade animations, infinite loading waves for active tracking, custom high-contrast notes highlighter schemes, and beautiful negative-spaced vector iconography.
 
+### 📱 Screenshots
+
+<p align="center">
+  <img src="assets/.aistudio/Screenshot%202026-06-01%20183648.png" width="220" alt="Activity Tracking Screen" style="margin: 10px;" />
+  <img src="assets/.aistudio/Screenshot%202026-06-01%20183706.png" width="220" alt="Daily Logs & Ratings" style="margin: 10px;" />
+  <img src="assets/.aistudio/Screenshot%202026-06-01%20183715.png" width="220" alt="Smart Notifier & Alarms" style="margin: 10px;" />
+  <img src="assets/.aistudio/Screenshot%202026-06-01%20183729.png" width="220" alt="Notion-style Notes Editor" style="margin: 10px;" />
+</p>
+<p align="center">
+  <img src="assets/.aistudio/Screenshot%202026-06-01%20183742.png" width="220" alt="Analytics Graphs" style="margin: 10px;" />
+  <img src="assets/.aistudio/Screenshot%202026-06-01%20183804.png" width="220" alt="Home Screen Widget" style="margin: 10px;" />
+  <img src="assets/.aistudio/Screenshot%202026-06-01%20165701.png" width="220" alt="Theme Toggle" style="margin: 10px;" />
+  <img src="assets/.aistudio/Screenshot%202026-06-01%20165715.png" width="220" alt="Stats Screen" style="margin: 10px;" />
+</p>
+
 ---
 
 ## Key Functional Modules
